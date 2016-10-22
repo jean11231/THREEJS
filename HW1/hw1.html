@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+	body{
+		overflow:hidden;
+	}
+</style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r78/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script>
+var renderer, scene, camera, light, controls, angle = 0,
+  pos, vel, force, power = 0;
+var ship;
+var mass = 1;
+var clock = new THREE.Clock();
+var keyboard = new KeyboardState();
+
+init();
+animate();
+
+function init() {
+  renderer = new THREE.WebGLRenderer();
+  document.body.appendChild(renderer.domElement);
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  renderer.setSize(width, height);
+
+  renderer.setClearColor(0x888888);
+
+  scene = new THREE.Scene();
+  var grid = new THREE.GridHelper(30, 3, 0xaaaa00, 0x333333);
+  scene.add(grid);
+  var axes = new THREE.AxisHelper(5);
+  scene.add(axes);
+
+  light = new THREE.PointLight(0xffffff);
+  light.position.set(100, 300, 200);
+  scene.add(light);
+
+  camera = new THREE.PerspectiveCamera(35, width / height, 1, 1000);
+  camera.position.y = 80;
+  camera.position.z = 70;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  window.addEventListener('resize', onWindowResize, false);
+  ////////////////////////////////////////////////////////////////
+  var geometry = new THREE.Geometry();
+  // add vertices
+  geometry.vertices.push(new THREE.Vector3(4, 0, 0));
+  geometry.vertices.push(new THREE.Vector3(0, 0, 1.5));
+  geometry.vertices.push(new THREE.Vector3(0, 0, -1.5));
+  geometry.vertices.push(new THREE.Vector3(0, 1.8, 0));
+
+  // add faces
+  geometry.faces.push(new THREE.Face3(0, 1, 2));
+  geometry.faces.push(new THREE.Face3(3, 1, 0));
+  geometry.faces.push(new THREE.Face3(3, 0, 2));
+  geometry.faces.push(new THREE.Face3(3, 2, 1));
+
+  // build necessary information
+  geometry.computeBoundingSphere();
+  geometry.computeFaceNormals();
+  geometry.computeVertexNormals();
+
+  var mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({
+    color: 0xff1278
+  }));
+  scene.add(mesh);
+  ship = new THREE.Object3D();
+  ship.add(mesh);
+  scene.add(ship);
+  ////////////////////////////////////////////////////////////////////////
+  pos = new THREE.Vector3();
+  vel = new THREE.Vector3();
+  force = new THREE.Vector3();
+
+}
+
+function animate() {
+
+  controls.update();
+  keyboard.update();
+
+  if (keyboard.pressed("home"))
+    power = 2;
+  if (keyboard.pressed("space"))
+    power = 0;
+  if (keyboard.pressed("up"))
+    power *= 1.0071;
+  if (keyboard.pressed("down"))
+    power /= 1.1;
+  if (keyboard.pressed("left"))
+    angle += 0.9;
+  if (keyboard.pressed("right"))
+    angle -= 0.9;
+    
+
+  force = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle).multiplyScalar(power);
+  var alpha = 1.5;
+  force.add(vel.clone().multiplyScalar(-alpha));
+
+  var dt = clock.getDelta();
+  vel.add(force.clone().multiplyScalar(dt / mass));
+  pos.add(vel.clone().multiplyScalar(dt));
+  if (vel.length() > 0.001) {
+    angle = Math.atan2(-vel.z, vel.x);
+  }
+
+  ship.position.copy(pos);
+  ship.rotation.y = angle;
+
+  requestAnimationFrame(animate);
+
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+window.focus();
+
+</script>
+</body>
+</html>
