@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+<body>
+<div id="info">"Space" to  jump
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script type="text/javascript">
+document.oncontextmenu=function(){return false;}
+</script>
+<script>
+var camera, scene, renderer;
+var satellite, angle = 0;
+var mousePoint;
+var mouse = new THREE.Vector2();
+//var stats;
+var pos, vel, force;
+var clock = new THREE.Clock();
+var ball;
+
+var keyboard = new KeyboardState();
+
+var ballR = 4;
+init();
+animate();
+
+function init() {
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+
+  pos = new THREE.Vector3(-20, 50, 0);
+  vel = new THREE.Vector3(0, 0, 0);
+  //force = new THREE.Vector3(0, -90, 0);
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-50, 50, 80, -20, -10, 100);
+  camera.position.z = 10;
+  scene.add(camera);
+
+  THREE.ImageUtils.crossOrigin = '';
+  texture = THREE.ImageUtils.loadTexture('http://i.imgur.com/tXBZP0M.png');
+  texture.wrapS = THREE.RepeatWrapping;
+  for(var i = 0; i < 5; i++){
+  var texMat = new THREE.MeshBasicMaterial({map: texture});
+  var background = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), texMat);
+  background.position.y = 30;
+  background.position.x = i*100;
+  scene.add(background);
+  }
+  
+  ball = new THREE.Mesh(new THREE.CircleGeometry(ballR, 30), new THREE.MeshBasicMaterial({
+    color: 0x12ff23
+  }));
+  scene.add(ball);
+  ball.position.y = 50;
+
+
+  window.addEventListener('resize', onWindowResize, false);
+ // window.addEventListener('mousedown', onDocumentMouseDown, false);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+function animate() {
+  var dt = clock.getDelta();
+
+	keyboard.update();
+  if(pos.x>0 && pos.x<400)
+  camera.position.x = pos.x;
+  if (keyboard.down ('space')) {  
+    vel.y += 50;
+  }
+  
+  if (keyboard.pressed ('right') && pos.x <= 450-ballR) {
+		
+    pos.x += 1;
+  }
+  if (keyboard.pressed ('left') && pos.x >= -50+ballR) {
+    pos.x -= 1;
+  }
+              
+  
+    
+    
+  // force: add gravity first
+  force = new THREE.Vector3(0, -90, 0);
+	if (pos.y <= ballR-16) {    // if contact, add contact force
+    force.add(new THREE.Vector3(0, 90, 0));
+	}  
+  
+  // then do Euler's
+  vel.add(force.clone().multiplyScalar(dt));
+  pos.add(vel.clone().multiplyScalar(dt));
+  ball.position.copy(pos);
+
+
+  // collision
+  // if (x-p).n < 0 then hit
+  
+  // bounce back
+  
+  if (pos.y <= ballR-16) {
+    //pos.y = 0;
+    vel.y *= -.53;
+  }
+  
+  
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+window.focus();
+</script>
+</body>
+</html>
