@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+body{
+	overflow:hidden;
+	}
+</style>
+</head>
+<body>
+<audio id="coins" style="display:none">
+<source src="HW3/coins.wav" type='audio/wav'>
+</audio>
+
+<audio id="jump" style="display:none">
+<source src="HW3/jump.wav" type='audio/wav'>
+</audio>
+
+<audio id="soundtrack" autoplay loop style="display:none">
+<source src="HW3/Where_I_am_From.mp3" type='audio/mp3'>
+</audio>
+<div id="info">"Space" to  jump
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script type="text/javascript">
+document.oncontextmenu=function(){return false;}
+</script>
+<script>
+var camera, scene, renderer;
+var satellite, angle = 0;
+
+var soundTrack,coins,jump;
+
+var pos, vel, force;
+var clock = new THREE.Clock();
+var ball;
+
+var keyboard = new KeyboardState();
+
+var ballR = 6;
+
+var stArray = [];
+var baseS = 0;
+var counter = 0;
+
+init();
+animate();
+function setUpStArray() {
+  for (var i = 0; i < 4; i++) {
+    var row = [];
+    for (var j = 0; j < 4; j++)
+      row.push(new THREE.Vector2(j * 0.33333, 1 - 0.33333 * i));
+    stArray.push(row);
+  }
+}
+
+function height (x) {
+	if ((x>-44 && x < 0) || (x>24 && x<100) || (x>124&&x<314) || (x>337 && x<444) )
+  	return -16;
+  else 
+  	return -5;
+}
+function init() {
+
+  jump= document.getElementById ('jump');
+  coins= document.getElementById ('coins');
+  soundTrack = document.getElementById ('soundtrack');
+	
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+
+  pos = new THREE.Vector3(-40, 50, 0);
+  vel = new THREE.Vector3(0, 0, 0);
+ 
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-50, 50, 80, -20, -10, 100);
+  camera.position.z = 10;
+  scene.add(camera);
+
+  THREE.ImageUtils.crossOrigin = '';
+  texture = THREE.ImageUtils.loadTexture('http://i.imgur.com/tXBZP0M.png');
+  texture.wrapS = THREE.RepeatWrapping;
+  for(var i = 0; i < 5; i++){
+  var texMat = new THREE.MeshBasicMaterial({map: texture});
+  var background = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), texMat);
+  background.position.y = 30;
+  background.position.x = i*100;
+  scene.add(background);
+  }
+  var gtexture = THREE.ImageUtils.loadTexture('http://i.imgur.com/j4mBwZW.png');
+  gtexture.wrapS = THREE.RepeatWrapping;
+  for(var i = 0; i < 5; i++){
+  var texg = new THREE.MeshBasicMaterial({map: gtexture,transparent: true});
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 20), texg);
+  ground.position.y = -26.5;
+  ground.position.x = i*100;
+  scene.add(ground);
+ 	}
+  var rockTexture = THREE.ImageUtils.loadTexture('http://i.imgur.com/vnhXLFU.png');
+  
+  var rock = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({map: rockTexture,transparent: true}));
+  rock.position.y = -11;
+  rock.position.x = 6+ballR;
+  var rockB = rock.clone();
+  rockB.position.x = 106+ballR;
+  var rockC = rock.clone();
+  rockC.position.x = 320+ballR;
+  scene.add(rock);
+  scene.add(rockB);
+  scene.add(rockC);
+//
+setUpStArray();
+
+  // loading texture from imgur.com
+  THREE.ImageUtils.crossOrigin = '';
+  texture = THREE.ImageUtils.loadTexture('http://i.imgur.com/8lNj0xO.png');
+  texture.wrapS = THREE.RepeatWrapping;
+
+  // setting up texMat
+  var texMat = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,  // cutout texture: set transparent: true
+    side: THREE.DoubleSide
+  });
+
+  var geometry = new THREE.Geometry();
+  geometry.vertices.push(
+    new THREE.Vector3(-10, -10, 0),
+    new THREE.Vector3(10, -10, 0),
+    new THREE.Vector3(10, 10, 0),
+    new THREE.Vector3(-10, 10, 0)
+  );
+
+  var face;
+  face = new THREE.Face3(0, 1, 2);
+  geometry.faces.push(face);
+  face = new THREE.Face3(0, 2, 3);
+  geometry.faces.push(face);
+
+  geometry.faceVertexUvs[0].push([stArray[1][2], stArray[1][3], stArray[0][3]]);
+  geometry.faceVertexUvs[0].push([stArray[1][2], stArray[0][3], stArray[0][2]]);
+
+  geometry.computeBoundingSphere();
+  geometry.computeFaceNormals();
+  geometry.computeVertexNormals();
+
+  sprite = new THREE.Mesh(geometry, texMat);
+  scene.add(sprite);
+//   
+  window.addEventListener('resize', onWindowResize, false);
+
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+function spriteAnimateR() {
+  var geometry = sprite.geometry;
+  var st0 = stArray[3][baseS];
+  var st1 = stArray[3][baseS + 1];
+  var st2 = stArray[2][baseS + 1];
+  var st3 = stArray[2][baseS];
+
+  geometry.faceVertexUvs[0] = [];
+  geometry.faceVertexUvs[0].push([st0, st1, st2]);
+  geometry.faceVertexUvs[0].push([st0, st2, st3]);
+  geometry.uvsNeedUpdate = true;
+
+  baseS = (baseS + 1) % 3;
+}
+function spriteAnimateL() {
+  var geometry = sprite.geometry;
+  var st0 = stArray[2][baseS];
+  var st1 = stArray[2][baseS + 1];
+  var st2 = stArray[1][baseS + 1];
+  var st3 = stArray[1][baseS];
+
+  geometry.faceVertexUvs[0] = [];
+  geometry.faceVertexUvs[0].push([st0, st1, st2]);
+  geometry.faceVertexUvs[0].push([st0, st2, st3]);
+  geometry.uvsNeedUpdate = true;
+
+  baseS = (baseS + 1) % 3;
+}
+
+function animate() {
+  var dt = clock.getDelta();
+	counter++;
+
+  if (counter % 10 === 0 && vel.x>0)
+  	spriteAnimateR();
+  if (counter % 10 === 0 && vel.x<0)
+  	spriteAnimateL();
+    
+	keyboard.update();
+  if(pos.x>0 && pos.x<400)
+  camera.position.x = pos.x;
+  if (keyboard.down ('space')) {  
+    vel.y += 50;
+    jump.play();
+  }
+  
+  if (keyboard.pressed ('right') && pos.x <= 450-ballR) {
+		
+    vel.x += 0.5;
+  }
+  if (keyboard.pressed ('left') && pos.x >= -50+ballR) {
+    vel.x -= 0.5;
+  }
+
+  
+  
+  force = new THREE.Vector3(0, -90, 0);
+	//if (pos.y <= ballR-16) {    // if contact, add contact force
+  //  force.add(new THREE.Vector3(0, 90, 0));
+	//}  
+  
+  // then do Euler's
+  vel.add(force.clone().multiplyScalar(dt));
+  pos.add(vel.clone().multiplyScalar(dt));
+  sprite.position.copy(pos);
+
+
+  
+   if (pos.y <= ballR + height (pos.x)) {
+		pos.y = ballR + height(pos.x);
+		vel.y *= -.3;
+  }
+  
+  // add contact force
+	if (pos.y <= ballR + height(pos.x)) {    // if contact, add contact force
+    force.add(new THREE.Vector3(0, 90, 0));
+    
+    // determine whether it is possible to make the horizontal move
+  // if x'> x   vel.x = 0
+  var sign = (vel.x) > 0 ? +1 : -1;
+  if (height(pos.x) < height(pos.x + 0.99991*sign))   // blocked
+    	vel.x = 0;
+	}  
+  
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+window.focus();
+</script>
+</body>
+
+</html>
