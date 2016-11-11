@@ -15,7 +15,11 @@ body{
 	}
 </style>
 </head>
-<body>
+<body>
+
+<div id="info">"Space" to  jump
+</div>
+
 <audio id="coins" style="display:none">
 <source src="HW3/coins.wav" type='audio/wav'>
 </audio>
@@ -27,13 +31,14 @@ body{
 <audio id="soundtrack" autoplay loop style="display:none">
 <source src="HW3/Where_I_am_From.mp3" type='audio/mp3'>
 </audio>
-<div id="info">"Space" to  jump
-</div>
+
+<script src="js/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
 <script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
 <script type="text/javascript">
 document.oncontextmenu=function(){return false;}
 </script>
+
 <script>
 var camera, scene, renderer;
 var satellite, angle = 0;
@@ -71,8 +76,8 @@ function height (x) {
 }
 function init() {
 
-  jump= document.getElementById ('jump');
-  coins= document.getElementById ('coins');
+  jump = document.getElementById ('jump');
+  coins = document.getElementById ('coins');
   soundTrack = document.getElementById ('soundtrack');
 	
 
