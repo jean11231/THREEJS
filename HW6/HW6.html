@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+body {
+	  background-color: #fff;
+	  color: #111;
+	  margin: 0px;
+	  overflow: hidden;
+	  font-family: Monospace;
+	  font-size: 20px;
+	}
+	
+	#info {
+	  position: absolute;
+	  top: 0px;
+	  width: 100%;
+	  padding: 5px;
+	  text-align: center;
+	  color: #ffff00
+	}
+	
+	a {
+	  color: #00ffff
+	}
+	
+	strong {
+	  color: red
+	}
+	
+	#container {
+	  z-index: 0;
+	  left: 0px;
+	  top: 0px;
+	  overflow: hidden;
+	  position: absolute;
+	  width: 100%;
+	  height: 100%;
+	}
+</style>
+</head>
+
+<body> 
+<div id="info">
+  Walk or run<br>
+  <button id="run">run</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r70/three.min.js"></script>
+<script src="https://dl.dropboxusercontent.com/u/3587259/Code/Threejs/OrbitControls.js">
+</script>
+<script src="https://rawgit.com/jyunming-chen/game3js/master/js/ccdbox.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script>
+var scene, renderer, camera, controls;
+var link1, link2;
+var Rlink1, Rlink2;
+var torso;
+var angle = 0;
+var turnR = false;
+var turnU = false;
+
+var Ltheta1 = 0, Ltheta2 = 0;
+var Rtheta1 = 0, Rtheta2 = 0;
+var LtargetMesh, RtargetMesh;
+var upperArmR,upperArmL,lowerArmR,lowerArmL;
+
+var joints = []; // world pos of three joints
+var axes = [];
+var target = new THREE.Vector3();
+
+var clock = new THREE.Clock();
+var ts, T = 1;
+
+var Lkeys1 = [
+[0,[-20.5,-33.5]], 
+[0.125,[-23.3,-28.0]], 
+[0.25,[-11.2,-31.7]], 
+[0.375,[14.0,-36.3]], 
+[0.5,[18.6,-37.3]], 
+[0.625,[11.2,-35.4]], 
+[0.75,[1.9,-35.4]], 
+[0.875,[-8.4,-35.4]], 
+[1,[-20.5,-33.5]]
+];
+
+var Rkeys1 = [
+[0.,[18.6,-37.3]], 
+[0.125,[11.2,-35.4]], 
+[0.25,[1.9,-35.4]], 
+[0.375,[-8.4,-35.4]], 
+[0.5,[-20.5,-33.5]],
+[0.625,[-23.3,-28.0]], 
+[0.75,[-11.2,-31.7]], 
+[0.875,[14.0,-36.3]], 
+[1.0,[18.6,-37.3]]
+];
+var Lkeys2 = [
+[0.,[-21,-11]], 
+[0.125,[-14,-18]], 
+[0.25,[-3,-24]], 
+[0.375,[12,-32]], 
+[0.5,[24,-38]],
+[0.625,[-15,-41]], 
+[0.75,[-37,-25]], 
+[0.875,[-31,-12]], 
+[1.0,[-21,-11]]
+];
+
+var Rkeys2 = [
+[0.,[24,-38]], 
+[0.125,[-15,-41]], 
+[0.25,[-37,-25]], 
+[0.375,[-31,-12]], 
+[0.5,[-21,-11]],
+[0.625,[-14,-18]], 
+[0.75,[-3,-24]], 
+[0.875,[12,-32]], 
+[1.0,[24,-38]]
+];
+
+
+init();
+animate();
+$("#run").click(function() {
+	turnR = !turnR;
+	turnU =false; 
+});
+$("#up").click(function() {
+	turnU = !turnU;
+  turnR =false;
+});
+////////////////////////////////////////////////////////
+// forward kinematics: in torso coordinate system
+//
+function fk(theta, joints) {
+  joints[0] = new THREE.Vector3(0,0, 0);
+
+  var m = new THREE.Matrix4();
+  m.makeTranslation (0,0,0);
+  
+  m.multiply(new THREE.Matrix4().makeRotationZ(-Math.PI/2 +theta[0]));
+  m.multiply(new THREE.Matrix4().makeTranslation(20, 0, 0));
+  var localzero = new THREE.Vector3(0, 0, 0);
+  localzero.applyMatrix4(m);
+  joints[1].copy(localzero);
+
+  m.multiply(new THREE.Matrix4().makeRotationZ(theta[1]));
+  m.multiply(new THREE.Matrix4().makeTranslation(22, 0, 0));
+  localzero.set(0, 0, 0);
+  localzero.applyMatrix4(m);
+  joints[2].copy(localzero);
+}
+
+/////////////////////////////////////////////////////////////
+// joint axis setup
+//
+function setarm() {
+  var axis = new CCD_axis(new THREE.Vector3(0, 0, 1), 0);
+  axes.push(axis);
+  var axis = new CCD_axis(new THREE.Vector3(0, 0, 1), 1);
+  axis.limits = new THREE.Vector2(-3.1, -0.01);
+  axes.push(axis);
+}
+
+
+////////////////////////////////////////////////////////////////
+function init() {
+  
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+	scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.y = 160;
+  camera.position.z = 400;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  document.body.appendChild(renderer.domElement);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  var gridXZ = new THREE.GridHelper(100, 10);
+  gridXZ.setColors(new THREE.Color(0xff0000), new THREE.Color(0xffffff));
+  scene.add(gridXZ);
+	var axisHelper = new THREE.AxisHelper (50);
+  scene.add (axisHelper);
+  
+  
+  //////////////////////////////////////////////////
+	ts = clock.getElapsedTime();
+  
+	torso = new THREE.Object3D();
+  scene.add (torso);
+  torso.position.y = 41;
+  var body = new THREE.Mesh(new THREE.BoxGeometry(20,50,20), new THREE.MeshNormalMaterial());
+  body.position.set(0,25,0);
+  
+  torso.add(body);
+  
+  LtargetMesh = new THREE.Mesh (new THREE.SphereGeometry (3,3,20,20), new THREE.MeshNormalMaterial());
+  torso.add (LtargetMesh);
+  RtargetMesh = LtargetMesh.clone();
+  torso.add (RtargetMesh);
+/////////////////////////////////////////////////
+//upperArmR,upperArmL,lowerArmR,lowerArmL
+
+var boxGeometry = new THREE.BoxGeometry(5, 20, 5);
+  var arm = new THREE.Mesh(boxGeometry, new THREE.MeshNormalMaterial());
+  upperArmR = new THREE.Object3D();
+  upperArmR.add(arm);
+  arm.position.set(0, -10, 2.5);
+  torso.add(upperArmR);
+  upperArmR.position.set(0, 50, 10);
+  
+
+  upperArmL = new THREE.Object3D();
+  var Larm = arm.clone(); 
+  upperArmL.add(Larm);
+  torso.add(upperArmL);
+  upperArmL.position.set(0,50,-10);
+  Larm.position.set(0,-10, -2.5);
+
+  //////////////////////////////////////////////
+
+  boxGeometry = new THREE.BoxGeometry(5, 20, 5);
+  arm2 = new THREE.Mesh(boxGeometry, new THREE.MeshNormalMaterial());
+  lowerArmR = new THREE.Object3D();
+  var Larm2 = arm2.clone();
+  lowerArmR.position.set(0, -20, 2.5);
+  upperArmR.add(lowerArmR);
+  lowerArmR.add(arm2);
+  arm2.position.set(0, -10, 0);
+  lowerArmL = new THREE.Object3D();
+  upperArmL.add(lowerArmL);
+  lowerArmL.add(Larm2);
+  lowerArmL.position.set(0, -20, -2.5);
+  Larm2.position.set(0, -10, 0);
+/////////////////////////////////////////////////
+	var headMesh = new THREE.Mesh(new THREE.BoxGeometry(25, 25, 25), new THREE.MeshNormalMaterial());
+  headMesh.position.set(0,62.5,0);
+  torso.add(headMesh);
+/////////////////////////////////////////////////
+	link1 = makeLink(20);
+  link1.position.set (0,0,-5.5);
+ // link1.rotation.order = 'ZYX';
+  link1.rotation.z = -Math.PI/2;
+ 	torso.add (link1);
+	link2 = makeLink(22);
+  link1.add (link2);
+  link2.position.set (20,0,0);
+
+	Rlink1 = makeLink(20);
+  Rlink1.position.set (0,0,5.5);
+ // link1.rotation.order = 'ZYX';
+  Rlink1.rotation.z = -Math.PI/2;
+ 	torso.add (Rlink1);
+	Rlink2 = makeLink(22);
+  Rlink1.add (Rlink2);
+  Rlink2.position.set (20,0,0);
+
+	for (var i = 0; i < 3; i++)
+    joints[i] = new THREE.Vector3();
+
+  // setting ccd_box
+  setarm();
+  window.addEventListener('resize', onWindowResize, false);
+}
+
+function makeLink(length) {
+  var oneLink = new THREE.Object3D();
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(length, 5,5), new THREE.MeshNormalMaterial());
+  oneLink.add(mesh);
+  mesh.position.set(length/2, 0, 0);
+  return oneLink;
+}
+
+function onWindowResize() {
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  update();
+  render();
+}
+
+function update() {
+  var t = clock.getElapsedTime();
+  angle += 0.0084;
+  
+ 	torso.position.set (100*Math.cos(angle), 41, -100*Math.sin(angle));
+  torso.rotation.y = angle + Math.PI/2;
+  
+  var s = ((t - ts)%T)/T;
+  
+  for (var i = 0; i < Lkeys1.length; i++) {
+  	if (s < Lkeys1[i][0]) break;  // take i-1
+  }
+  var ii = i-1;
+  var alpha = (s - Lkeys1[ii][0]) / (Lkeys1[ii+1][0] - Lkeys1[ii][0]);
+
+	var pos = [1,1];
+//console.log (s + ',' + ii);
+
+	// left leg
+  for (var j = 0; j < 2; j++) {
+  	pos[j] = (1-alpha)*Lkeys1[ii][1][j] + alpha*Lkeys1[ii+1][1][j];
+  }
+  target.set (pos[0], pos[1], 0);
+  LtargetMesh.position.set (pos[0], pos[1], -5.5);
+  
+  var theta = [Ltheta1, Ltheta2]; 
+
+	// ik_ccd works on the theta array
+  ik_ccd(target, theta);
+
+  // copy the theta array to theta1 & theta2  
+  Ltheta1 = theta[0], Ltheta2 = theta[1];
+	
+  //theta1 = Math.PI/6; theta2 = - Math.PI/6;
+
+	// right leg
+  for (var j = 0; j < 2; j++) {
+  	pos[j] = (1-alpha)*Rkeys1[ii][1][j] + alpha*Rkeys1[ii+1][1][j];
+  }
+  target.set (pos[0], pos[1], 0);
+  RtargetMesh.position.set (pos[0], pos[1], 5.5);
+  
+  var theta = [Rtheta1, Rtheta2]; 
+
+	// ik_ccd works on the theta array
+  ik_ccd(target, theta);
+
+  // copy the theta array to theta1 & theta2  
+  Rtheta1 = theta[0], Rtheta2 = theta[1];
+  //////////////////////////////////////////////////////
+  if(turnR){
+  var t = clock.getElapsedTime();
+  angle += 0.0084;
+  
+  torso.position.set (100*Math.cos(angle), 41, -100*Math.sin(angle));
+  torso.rotation.y = angle + Math.PI/2;
+  
+  var s = ((t - ts)%T)/T;
+  
+  for (var i = 0; i < Lkeys2.length; i++) {
+  	if (s < Lkeys2[i][0]) break; 
+  }
+  var ii = i-1;
+  var alpha = (s - Lkeys2[ii][0]) / (Lkeys2[ii+1][0] - Lkeys2[ii][0]);
+
+	var pos = [1,1];
+
+  for (var j = 0; j < 2; j++) {
+  	pos[j] = (1-alpha)*Lkeys2[ii][1][j] + alpha*Lkeys2[ii+1][1][j];
+  }
+  target.set (pos[0], pos[1], 0);
+  LtargetMesh.position.set (pos[0], pos[1], -5.5);
+  
+  var theta = [Ltheta1, Ltheta2]; 
+
+  ik_ccd(target, theta);
+
+  Ltheta1 = theta[0], Ltheta2 = theta[1];
+
+  for (var j = 0; j < 2; j++) {
+  	pos[j] = (1-alpha)*Rkeys2[ii][1][j] + alpha*Rkeys2[ii+1][1][j];
+  }
+  target.set (pos[0], pos[1], 0);
+  RtargetMesh.position.set (pos[0], pos[1], 5.5);
+  
+  var theta = [Rtheta1, Rtheta2]; 
+
+  ik_ccd(target, theta);
+
+  Rtheta1 = theta[0], Rtheta2 = theta[1];
+  
+  
+  }
+  
+
+}
+
+
+function render() {
+
+	link1.rotation.z = -Math.PI/2 + Ltheta1;
+  link2.rotation.z = Ltheta2;
+
+	Rlink1.rotation.z = -Math.PI/2 + Rtheta1;
+  Rlink2.rotation.z = Rtheta2;
+  
+  upperArmR.rotation.z=Ltheta1;
+  lowerArmR.rotation.z=Math.PI/9;
+  upperArmL.rotation.z=Rtheta1;
+	lowerArmL.rotation.z=Math.PI/9;
+  
+  if(turnR)
+  	torso.rotation.z= -Math.PI/18;
+  else
+  	torso.rotation.z= 0;
+  
+	renderer.render(scene, camera);
+}
+
+
+</script>
+
+</body>
+
+</html>
